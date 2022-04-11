@@ -5,7 +5,6 @@
 import os
 import re
 from tqdm import tqdm
-from collections import defaultdict
 from optparse import OptionParser
 import pandas as pd
 from ParseGTF import ParseGTF
@@ -68,19 +67,14 @@ def getNodePositions(splice_sites: pd.DataFrame):
 	return pd.DataFrame(nodes)
 
 def getNodeID(nodes: pd.DataFrame, exons: pd.DataFrame):
-	nid = []
+	new_nodes = []
 	for _, node in nodes.iterrows():
 		is_grown = False
 		for _, exon in exons.iloc[::-1].iterrows():
 			if (node["start"] >= exon["exon start"] or node["end"] <= exon["exon end"]):
-				nid.append(f'{exon["transcript id"]}-{node["start"]}')
-				is_grown = True
-				break
-		if not is_grown:
-			raise ValueError("Node does not exist in exonic region.")
-	nodes.index = nid
+				new_nodes.append(node.rename(f'{exon["transcript id"]}-{node["start"]}'))
 
-	return nodes
+	return pd.DataFrame(new_nodes)
 
 def getNodeConnections(nodes: pd.DataFrame, Sequences):
 	nodes_out = [
