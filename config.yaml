@@ -5,16 +5,16 @@
 
 # input splice graph
 # format must be .vg
-graph: HumanUpdated38V5.gfa
+graph: human-SIRV3-np.gfa
 
 # reference transcripts
 # format can be either fasta/fastq, gzipped or not
-transcripts: HumanTranscriptsReduced.fa
+transcripts: human-SIRV3-np.fa
 # sequenced reads
 # format can be either fasta/fastq, gzipped or not
 # for more files, add them in new lines starting with "- "
 # NOTE: the file names without ending must be unique! You cannot have eg. reads.fq and reads.fa
-reads: humanNA12878dRNA.fasta
+reads: free-A.fastq.gz
 
 #optional params below: default values will probably work
 
@@ -38,8 +38,8 @@ gtffile: HomoSapiens.gtf
 #file paths
 
 # https://bitbucket.org/dilipdurai/aeron/
-scripts: /MMCI/MS/LongRNA/work/mikko/AERON_runs/run_20200515_threeprime/Aeron/AeronScripts
+scripts: /qbio/hansb/softwares/Aeron/AeronScripts
 # https://github.com/maickrau/GraphAligner
-binaries: /MMCI/MS/LongRNA/work/mikko/AERON_runs/run_20200515_threeprime/Aeron/Binaries
+binaries: /qbio/hansb/softwares/Aeron/Binaries
 # needed to convert mummer seeds to .gam seeds
-vgpath: /MMCI/MS/LongRNA/work/mikko/vg/vg
+vgpath: vg

@@ -6,8 +6,10 @@ import os
 import re
 from tqdm import tqdm
 from optparse import OptionParser
+import numpy as np
 import pandas as pd
-from ParseGTF import ParseGTF
+from Bio import SeqIO
+from ParseGTF import ParseGTF, ParseGFF
         
 class ParseOptions():
 	def getoptions(self):
@@ -22,65 +24,73 @@ class ParseOptions():
 class SequenceAnalyser():
 	def FParser(self, seq):
 		Sequences = {}
-		f=open(seq)
-		line = f.readline()
-		seq_id=""		
-		sequence=""
-		while line:
-			if (re.match(r'^\>', line.rstrip())):
-				Sequences[seq_id] = sequence
-				seq_id = (line.rstrip().split(" "))[0]
-				sequence=""				
-			else:
-				sequence=sequence+(line.rstrip())
-			line = f.readline()
-		Sequences[seq_id] = sequence
+		seqparse = SeqIO.parse(seq, 'fasta')
+		
+		for seq in seqparse:
+			seq_id, sequence = seq.id, seq.seq
+			
+			Sequences[seq_id] = sequence
 		return Sequences
-	
-	def getExonSequences(self, Sequences, exons, gb):
-		Esequences = {}
-		for exon in exons:
-			key = ">"+gb.getChromosome(exon)[0]
-			sequence = Sequences[key]
-			length = gb.getEnd(exon) - gb.getStart(exon) 
-			Esequences[exon] = sequence[(gb.getStart(exon)-1):gb.getStart(exon)+length]
-		return Esequences
 
 
 def GraphBuild(exons: pd.DataFrame, Sequences):
-	splice_sites = exons[["exon start", "exon end"]].melt().sort_values("value")
+	chr = exons["chr"][0]
+	splice_sites = exons[["transcript id", "exon start", "exon end"]].melt("transcript id").sort_values("value")
 	nodes = getNodePositions(splice_sites)
-	nodes = getNodeID(nodes, exons)
-	nodes_out, corrections_out = getNodeConnections(nodes, Sequences)
+	# nodes = getNodeIDs(nodes, exons)
+	nodes_out, connections_out = getNodeConnections(nodes, Sequences[chr])
 	
-	return nodes_out, corrections_out
+	return nodes_out, connections_out
+
+
+# def getNodeStartEnd(two_splice_sites: pd.DataFrame):
+# 	node = two_splice_sites["value"]
+# 	node.index = ["start", "end"]
+# 	node.rename(two_splice_sites["transcript id"].iloc[1], inplace=True)
+# 	if node["start"] == node["end"]:
+# 		node.loc[["start", "end"]] = np.nan
+# 	elif two_splice_sites["variable"].iloc[0] and two_splice_sites["variable"].iloc[1]: # start start
+# 		node["end"] -= 1
+# 	elif not (two_splice_sites["variable"].iloc[0] or two_splice_sites["variable"].iloc[1]): # end end
+# 		node["start"] += 1
+# 	elif two_splice_sites["variable"].iloc[0] and not two_splice_sites["variable"].iloc[1]: # start end
+# 		pass
+# 	else:
+# 		node.loc[["start", "end"]] = np.nan
+
+# 	return node
+
 
 def getNodePositions(splice_sites: pd.DataFrame):
-	rows = splice_sites.iterrows()
-	_, prev_site = next(rows)
 	nodes = []
-	for _, curr_site in rows:
-		if prev_site["variable"] == "exon end" and curr_site["variable"] == "exon start":
-			nodes.append({"start": prev_site["value"], "end": curr_site["value"]})
-		prev_site = curr_site
+	splice_sites["variable"] = splice_sites["variable"] == "exon start"
+	for two_splice_sites in splice_sites.rolling(2):
+		if len(two_splice_sites) < 2:
+			continue
+		node = two_splice_sites["value"].copy()
+		node.index = ["start", "end"]
+		node.rename(
+			f'{two_splice_sites["transcript id"].iloc[1]}-{node["start"]}', inplace=True
+		)
+		if node["start"] == node["end"]:
+			continue
+		if two_splice_sites["variable"].iloc[0] and two_splice_sites["variable"].iloc[1]: # start start
+			node["end"] -= 1
+		elif not (two_splice_sites["variable"].iloc[0] or two_splice_sites["variable"].iloc[1]): # end end
+			node["start"] += 1
+		elif two_splice_sites["variable"].iloc[0] and not two_splice_sites["variable"].iloc[1]: # start end
+			pass
+		else:
+			continue
+		nodes.append(node)
 
-	return pd.DataFrame(nodes)
+	return pd.DataFrame(nodes).dropna().astype("int")
 
-def getNodeID(nodes: pd.DataFrame, exons: pd.DataFrame):
-	new_nodes = []
-	for _, node in nodes.iterrows():
-		is_grown = False
-		for _, exon in exons.iloc[::-1].iterrows():
-			if (node["start"] >= exon["exon start"] or node["end"] <= exon["exon end"]):
-				new_nodes.append(node.rename(f'{exon["transcript id"]}-{node["start"]}'))
 
-	return pd.DataFrame(new_nodes)
-
-def getNodeConnections(nodes: pd.DataFrame, Sequences):
+def getNodeConnections(nodes: pd.DataFrame, sequence: str):
 	nodes_out = [
-		f'S {idx}	{sequence[node["start"] - 1 : node["end"]]}' 
-		for (idx, node), sequence 
-		in zip(nodes.iterrows(), Sequences)
+		f'S	{idx}	{sequence[node["start"] - 1 : node["end"]]}' 
+		for idx, node in nodes.iterrows()
 	]
 	connections_out = []
 	nids = nodes.index.to_list()
@@ -114,12 +124,11 @@ if __name__ == "__main__":
 	print("Done reading sequences")
 
 	print("Reading and processing gtf")
-	pg = ParseGTF(fn)
+	pg = ParseGTF(fn) if fn.endswith(".gtf") else ParseGFF(fn)
 	print("Done reading gtf")
 
-	genes = pg.index.unique("gene id")
 	print("Building graph")
-
+	genes = pg.index.unique("gene id")
 	for gene in tqdm(genes):
 		nodes_of_gene, connections_of_gene = GraphBuild(pg.loc[gene], fasta)
 		nodes += nodes_of_gene

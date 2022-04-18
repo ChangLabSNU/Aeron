@@ -21,17 +21,17 @@ nam=""
 tmp="hi"
 for line in m:
     ent=line.rstrip().split("\t")
-    if(float(ent[-2])>0.2):
+    if(float(ent[-1])>0.2):
         if(ent[0] != nam):
             max=0
             mt[ent[0]]=""
-        if(float(ent[-2])>max):
+        if(float(ent[-1])>max):
             mt[ent[0]]=[]
             tran=ent[1].split(".")[0]
             mt[ent[0]] = tran
             mt1[ent[0]] = float(ent[-1])
             nam=ent[0]
-            max=float(ent[-2])
+            max=float(ent[-1])
         elif(float(ent[-1])==max):
             tran=ent[1].split(".")[0]
             if(float(ent[-1])<float(mt1[ent[0]])):

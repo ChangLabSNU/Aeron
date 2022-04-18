@@ -20,9 +20,11 @@ GRAPHFILE_NAME = GRAPHFILE_FULLNAME.split('.')[0]
 
 def readfile_withending(wildcards):
 	for r in READFILE_FULLNAME:
-		if r.split('.')[0] == wildcards.reads:
+		if r.split('.', maxsplit=1)[0] == wildcards.reads:
 			return "input/" + r
-	if wildcards.reads == TRANSCRIPTFILE_NAME: return "input/" + TRANSCRIPTFILE_FULLNAME
+	print(TRANSCRIPTFILE_NAME)
+	if wildcards.reads == TRANSCRIPTFILE_NAME:
+		return "input/" + TRANSCRIPTFILE_FULLNAME
 	assert False
 
 rule all:
@@ -47,8 +49,9 @@ rule align:
 	benchmark:
 		"benchmark/aln_{reads}_{graph}_all.txt"
 	threads: 15
-	shell:
-		"/usr/bin/time -v {ALIGNERBINPATH}/GraphAligner -g {input.graph} -f {input.reads} --try-all-seeds --seeds-mxm-length {SEEDSIZE} --seeds-mem-count {MAXSEEDHITS} --seeds-mxm-cache-prefix tmp/seedcache -a {output} -t {threads} -b {ALIGNERBANDWIDTH} {ALIGNMENTSELECTION} 1> tmp/aligner_stdout.txt 2> tmp/aligner_stderr.txt"
+	run:
+		shell("mkdir -p tmp")
+		shell("{ALIGNERBINPATH}/GraphAligner -g {input.graph} -f {input.reads} --try-all-seeds --seeds-mxm-length {SEEDSIZE} --seeds-mem-count {MAXSEEDHITS} --seeds-mxm-cache-prefix tmp/seedcache -a {output} -t {threads} -b {ALIGNERBANDWIDTH} {ALIGNMENTSELECTION} 1> tmp/aligner_stdout.txt 2> tmp/aligner_stderr.txt")
 
 rule postprocess:
 	input:
