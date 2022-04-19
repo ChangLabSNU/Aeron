@@ -22,7 +22,6 @@ def readfile_withending(wildcards):
 	for r in READFILE_FULLNAME:
 		if r.split('.', maxsplit=1)[0] == wildcards.reads:
 			return "input/" + r
-	print(TRANSCRIPTFILE_NAME)
 	if wildcards.reads == TRANSCRIPTFILE_NAME:
 		return "input/" + TRANSCRIPTFILE_FULLNAME
 	assert False

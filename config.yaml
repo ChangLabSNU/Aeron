@@ -9,7 +9,7 @@ graph: human-SIRV3-np.gfa
 
 # reference transcripts
 # format can be either fasta/fastq, gzipped or not
-transcripts: human-SIRV3-np.fa
+transcripts: human-SIRV3-np-t.fasta.gz
 # sequenced reads
 # format can be either fasta/fastq, gzipped or not
 # for more files, add them in new lines starting with "- "
@@ -33,7 +33,7 @@ alignment_E_cutoff: 1
 #bandwidth for the aligner. Higher means more accurate but slower alignment.
 aligner_bandwidth: 35
 
-gtffile: HomoSapiens.gtf
+gtffile: human-SIRV3-np.gtf
 
 #file paths
 
