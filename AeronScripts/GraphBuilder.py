@@ -3,12 +3,13 @@
 #1       havana  exon    13221   14409   .       +       .       gene_id "ENSG00000223972"; gene_version "5"; transcript_id "ENST00000456328"; transcript_version "2"; exon_number "3"; gene_name "DDX11L1"; gene_source "havana"; gene_biotype "transcribed_unprocessed_pseudogene"; transcript_name "DDX11L1-202"; transcript_source "havana"; transcript_biotype "processed_transcript"; exon_id "ENSE00002312635"; exon_version "1"; tag "basic"; transcript_support_level "1";
 
 import os
-import sys
 import re
-import optparse
+from tqdm import tqdm
 from optparse import OptionParser
-from optparse import Option, OptionValueError
-from ParseGTF import *
+import numpy as np
+import pandas as pd
+from Bio import SeqIO
+from ParseGTF import ParseGTF, ParseGFF
         
 class ParseOptions():
 	def getoptions(self):
@@ -23,183 +24,120 @@ class ParseOptions():
 class SequenceAnalyser():
 	def FParser(self, seq):
 		Sequences = {}
-		f=open(seq)
-		line = f.readline()
-		seq_id=""		
-		sequence=""
-		while line:
-			if (re.match(r'^\>', line.rstrip())):
-				Sequences[seq_id] = sequence
-				seq_id = (line.rstrip().split(" "))[0]
-				sequence=""				
-			else:
-				sequence=sequence+(line.rstrip())
-			line = f.readline()
-		Seiquences[seq_id] = sequence
+		seqparse = SeqIO.parse(seq, 'fasta')
+		
+		for seq in seqparse:
+			seq_id, sequence = seq.id, seq.seq
+			
+			Sequences[seq_id] = sequence
 		return Sequences
+
+
+def GraphBuild(exons: pd.DataFrame, Sequences):
+	chr = exons["chr"][0]
+	splice_sites = exons[["transcript id", "exon start", "exon end"]].melt("transcript id").sort_values("value")
+	nodes = getNodePositions(splice_sites)
+	# nodes = getNodeIDs(nodes, exons)
+	nodes_out, connections_out = getNodeConnections(nodes, Sequences[chr])
 	
-	def getExonSequences(self, Sequences, exons, gb):
-		Esequences = {}
-		for exon in exons:
-			key = ">"+gb.getChromosome(exon)[0]
-			sequence = Sequences[key]
-			length = gb.getEnd(exon) - gb.getStart(exon) 
-			Esequence[exon] = sequence[(gb.getStart(exon)-1):gb.getStart(exon)+length]
-		return Esequences
+	return nodes_out, connections_out
 
-class GraphBuild():
-	def SortExons(self, gb, exons):
-		start = []
-		end = []
-		chromosome = []
-		exn = []
-		for exon in exons:
-			start.append(gb.getStart(exon))
-			chromosome.append(gb.getChromosome(exon)[0])
-			end.append(gb.getEnd(exon))
-		end = [ed for _, ed in sorted(zip(start,end))]
-		chromosome = [cd for _, cd in sorted(zip(start,chromosome))]		
-		start = sorted(start)
-		return start,end,chromosome
-	
-	def DefineCluster(self, start, end, chromosome):
-		cluster = defaultdict(list)
-		cchromosome = defaultdict(list)
-		strt = start[0]
-		ed = end[0]
-		j=0;
-		for i in range(0, len(start)):
-			if(start[i] >= strt and end[i] <= ed):
-				if(start[i] not in cluster[j]):
-					cluster[j].append(start[i])
-					cchromosome[j].append(chromosome[i])
-				if(end[i] not in cluster[j]):
-					cluster[j].append(end[i])
-					cchromosome[j].append(chromosome[i])
-			elif(start[i] >= strt and start[i] <= ed):
-				if(start[i] not in cluster[j]):
-					cluster[j].append(start[i])
-					cchromosome[j].append(chromosome[i])
-				if(end[i] not in cluster[j]):
-					cluster[j].append(end[i])
-					cchromosome[j].append(chromosome[i])
-				ed = end[i]
-			elif (start[i] > ed):
-				j=j+1
-				strt = start[i]
-				ed = end[i]
-				if(start[i] not in cluster[j]):
-					cluster[j].append(start[i])
-					cchromosome[j].append(chromosome[i])
-				if(end[i] not in cluster[j]):
-					cluster[j].append(end[i])
-					cchromosome[j].append(chromosome[i])
-			else:
-				print("Something went wrong")
-				exit()
 
-		for i in range(0, len(cluster)):
-			cluster[i] = sorted(cluster[i])
-			cchromosome[i] = sorted(cchromosome[i])
-		return cluster,cchromosome
+# def getNodeStartEnd(two_splice_sites: pd.DataFrame):
+# 	node = two_splice_sites["value"]
+# 	node.index = ["start", "end"]
+# 	node.rename(two_splice_sites["transcript id"].iloc[1], inplace=True)
+# 	if node["start"] == node["end"]:
+# 		node.loc[["start", "end"]] = np.nan
+# 	elif two_splice_sites["variable"].iloc[0] and two_splice_sites["variable"].iloc[1]: # start start
+# 		node["end"] -= 1
+# 	elif not (two_splice_sites["variable"].iloc[0] or two_splice_sites["variable"].iloc[1]): # end end
+# 		node["start"] += 1
+# 	elif two_splice_sites["variable"].iloc[0] and not two_splice_sites["variable"].iloc[1]: # start end
+# 		pass
+# 	else:
+# 		node.loc[["start", "end"]] = np.nan
 
-	def getNodeID(self, gb, nodes, nodee, exons):
-		nid = {}
-		for exon in exons:
-			enumber = gb.getExonNumber(exon)
-			estart = gb.getStart(exon)
-			eend = gb.getEnd(exon)
-			key = gb.getTranscript(exon)
-			for i in range(0, len(nodes)):
-				if(nodes[i]>=estart and nodee[i]<=eend):
-					nid[nodes[i]]= key+"-"+str(nodes[i])
-		return nid 
-		
-	def getNodePositions(self, cluster, cchromosome):
-		nodes = []
-		nodee = []
-		chrnod = []
-		i=1
-		if(len(cluster) == 1 and len(cluster[0]) == 2):
-			nodes.append(cluster[0][0])
-			nodee.append(cluster[0][1])
-			chrnod.append(cchromosome[0][0])
+# 	return node
+
+
+def getNodePositions(splice_sites: pd.DataFrame):
+	nodes = []
+	splice_sites["variable"] = splice_sites["variable"] == "exon start"
+	for two_splice_sites in splice_sites.rolling(2):
+		if len(two_splice_sites) < 2:
+			continue
+		node = two_splice_sites["value"].copy()
+		node.index = ["start", "end"]
+		node.rename(
+			f'{two_splice_sites["transcript id"].iloc[1]}-{node["start"]}', inplace=True
+		)
+		if node["start"] == node["end"]:
+			continue
+		if two_splice_sites["variable"].iloc[0] and two_splice_sites["variable"].iloc[1]: # start start
+			node["end"] -= 1
+		elif not (two_splice_sites["variable"].iloc[0] or two_splice_sites["variable"].iloc[1]): # end end
+			node["start"] += 1
+		elif two_splice_sites["variable"].iloc[0] and not two_splice_sites["variable"].iloc[1]: # start end
+			pass
 		else:
-			for i in range(0, len(cluster)):
-				for j in range(0,len(cluster[i])-1):
-					nodes.append(cluster[i][j])
-					nodee.append(cluster[i][j+1])
-					chrnod.append(cchromosome[i][j])
-		return nodes,nodee,chrnod
+			continue
+		nodes.append(node)
+
+	return pd.DataFrame(nodes).dropna().astype("int")
+
+
+def getNodeConnections(nodes: pd.DataFrame, sequence: str):
+	nodes_out = [
+		f'S	{idx}	{sequence[node["start"] - 1 : node["end"]]}' 
+		for idx, node in nodes.iterrows()
+	]
+	connections_out = []
+	nids = nodes.index.to_list()
+	for idx, nid_src in enumerate(nids):
+		for nid_dest in nids[idx + 1:]:
+			connections_out.append(f"L	{nid_src}	+	{nid_dest}	+	0M")
+
+	return nodes_out, connections_out
 	
-	def getNodeConnections(self, nodeid, ndst, nden, chrnod, Sequences, nodes, connections):
-		bookkeep = {}
-		for i in range(0, len(nodeid)):
-			bookkeep[nodeid[ndst[i]]]=0
 
-		for i in range(0, len(nodeid)):
-			chromo = chrnod[i]
-			key=">chr"+chromo
-			if(key in Sequences.keys()):
-				sequence = Sequences[key]			
-				length = (nden[i]-ndst[i])+1
-				if(len(ndst)>0):
-					if(len(ndst)==1):
-						sseq = sequence[ndst[i]-1:(ndst[i]+length)]			
-					if(i<=(len(ndst)-1)):
-						sseq = sequence[ndst[i]-1:(ndst[i]+length)]
-					nodes.append("S	"+str(nodeid[ndst[i]])+"	"+sseq)
-					bookkeep[str(nodeid[ndst[i]])] = 1
-		for i in range(0, len(nodeid)):
-			if(bookkeep[str(nodeid[ndst[i]])]==1):
-				for j in range(i+1, len(nodeid)):
-					if(bookkeep[str(nodeid[ndst[j]])]==1):
-						connections.append("L	"+str(nodeid[ndst[i]])+"	+	"+str(nodeid[ndst[j]])+"	+	0M")
-		return nodes, connections
-
-	def sanityCheck(self, nodes, connections):
-		if len(nodes)==0:
-			print("Warning: No sequence information added")
-		if len(connections)==0:
-			print("Warning: No connection information added")
+def sanityCheck(nodes, connections):
+	if len(nodes)==0:
+		print("Warning: No sequence information added")
+	if len(connections)==0:
+		print("Warning: No connection information added")
 		
 
-po  = ParseOptions().getoptions()
-gb  = GraphBuild()
-sq  = SequenceAnalyser() 
-fn  = po.gf
-seq = po.ef
-out = po.out
+if __name__ == "__main__":
+	po  = ParseOptions().getoptions()
+	sq  = SequenceAnalyser() 
+	fn  = po.gf
+	seq = po.ef
+	out = po.out
 
-f = open(out, "w")
-nodes = []
-connections = []	
-		
-print("Reading Sequences")
-fasta = sq.FParser(seq)
-print("Done reading sequences")
+	f = open(out, "w")
+	nodes = []
+	connections = []	
+			
+	print("Reading Sequences")
+	fasta = sq.FParser(seq)
+	print("Done reading sequences")
 
-print("Reading and processing gtf")
-pg = ParseGTF(fn)
-print("Done reading gtf")
+	print("Reading and processing gtf")
+	pg = ParseGTF(fn) if fn.endswith(".gtf") else ParseGFF(fn)
+	print("Done reading gtf")
 
-print("Collecting all the genes")
-transcripts = pg.getAllGenes()
-print("Building graph for:")
+	print("Building graph")
+	genes = pg.index.unique("gene id")
+	for gene in tqdm(genes):
+		nodes_of_gene, connections_of_gene = GraphBuild(pg.loc[gene], fasta)
+		nodes += nodes_of_gene
+		connections += connections_of_gene
 
-for transcript in transcripts:
-    print(transcript)
-    ex = pg.getExons(transcript)
-    start,end, chromosome = gb.SortExons(pg, ex)
-    cluster, cchromosome = gb.DefineCluster(start, end, chromosome)
-    ndst,nden,chrnod = gb.getNodePositions(cluster, cchromosome)	
-    nodeid=gb.getNodeID(pg, ndst, nden, ex)
-    nodes, connections = gb.getNodeConnections(nodeid, ndst, nden, chrnod, fasta, nodes, connections)
+	f.write("\n".join(nodes))
+	f.write("\n")
+	f.write("\n".join(connections))
 
-for i in nodes:
-	f.write(i+"\n")
+	sanityCheck(nodes, connections)
 
-for i in connections:
-	f.write(i+"\n")
-
-gb.sanityCheck(nodes, connections)
+	f.close()

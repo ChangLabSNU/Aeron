@@ -15,6 +15,11 @@ The software can be downloaded by using the following command
 ```
 	git clone https://github.com/SchulzLab/Aeron.git 
 ```
+The environment for this fork is provided as a conda environment, and it can be installed like below. This command produces an environment named `aeron`.
+```
+	cd Aeron
+	conda create --file environment.yaml
+```
 
 ## Pipeline
 The downloaded folder should contain a "snakemake-pipeline" folder which contains the following files and folders:
