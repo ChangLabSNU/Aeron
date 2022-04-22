@@ -1,3 +1,5 @@
+import os
+
 configfile: "config.yaml"
 VGPATH = config["vgpath"]
 SCRIPTPATH=config["scripts"]
@@ -11,42 +13,48 @@ ALIGNERBANDWIDTH = config["aligner_bandwidth"]
 GTFPATH = config["gtffile"]
 ALIGNMENTSELECTION = config["alignment_selection"]
 ECUTOFF = config["alignment_E_cutoff"]
+OUTDIR = config["outdir"]
 
 if isinstance(READFILE_FULLNAME, str): READFILE_FULLNAME = [READFILE_FULLNAME]
 
-READFILE_NAME = [path.split('.')[0] for path in READFILE_FULLNAME]
-TRANSCRIPTFILE_NAME = TRANSCRIPTFILE_FULLNAME.split('.')[0]
-GRAPHFILE_NAME = GRAPHFILE_FULLNAME.split('.')[0]
+READFILE_NAME = [os.path.basename(path).split('.', maxsplit=1)[0] for path in READFILE_FULLNAME]
+TRANSCRIPTFILE_NAME = os.path.basename(TRANSCRIPTFILE_FULLNAME).split('.', maxsplit=1)[0]
+GRAPHFILE_NAME = os.path.basename(GRAPHFILE_FULLNAME).split('.', maxsplit=1)[0]
 
 def readfile_withending(wildcards):
 	for r in READFILE_FULLNAME:
-		if r.split('.', maxsplit=1)[0] == wildcards.reads:
-			return "input/" + r
-	if wildcards.reads == TRANSCRIPTFILE_NAME:
-		return "input/" + TRANSCRIPTFILE_FULLNAME
+		if os.path.basename(r).split('.', maxsplit=1)[0] == wildcards.reads:
+			return r
+	if wildcards.reads == os.path.basename(TRANSCRIPTFILE_NAME):
+		return TRANSCRIPTFILE_FULLNAME
+	assert False
+
+def graph_path(wildcards):
+	if wildcards.graph == os.path.basename(GRAPHFILE_FULLNAME).split(".", maxsplit=1)[0]:
+		return GRAPHFILE_FULLNAME
 	assert False
 
 rule all:
 	input:
-		expand("output/aln_{reads}_{graph}_all.gam", reads=READFILE_NAME, graph=GRAPHFILE_NAME),
-		expand("output/aln_{reads}_{graph}_selected.gam", reads=READFILE_NAME, graph=GRAPHFILE_NAME),
-		expand("output/aln_{reads}_{graph}_full_length.gam", reads=READFILE_NAME, graph=GRAPHFILE_NAME),
-		#expand("output/alignmentstats_{reads}_{graph}.txt", reads=READFILE_NAME, graph=GRAPHFILE_NAME),
-		expand("output/aln_{transcript}_{graph}_full_length.gam", transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME),
-		#expand("output/alignmentstats_{transcript}_{graph}.txt", transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME),
-		expand("output/matrix_{reads}_{transcript}_{graph}_all.txt", reads=READFILE_NAME, transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME),
-		#expand("output/matrix_{reads}_{transcript}_{graph}_bestmatch.txt", reads=READFILE_NAME, transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME),
-		expand("output/matrixstats_{reads}_{transcript}_{graph}.txt", reads=READFILE_NAME, transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME),
-		expand("output/CountMatrix_{reads}_{transcript}_{graph}.txt", reads=READFILE_NAME, transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME)
+		expand(OUTDIR + "/aln.{reads}.{graph}.all.gam", reads=READFILE_NAME, graph=GRAPHFILE_NAME),
+		expand(OUTDIR + "/aln.{reads}.{graph}.selected.gam", reads=READFILE_NAME, graph=GRAPHFILE_NAME),
+		expand(OUTDIR + "/aln.{reads}.{graph}.full_length.gam", reads=READFILE_NAME, graph=GRAPHFILE_NAME),
+		#expand(OUTDIR + "/alignmentstats.{reads}.{graph}.txt", reads=READFILE_NAME, graph=GRAPHFILE_NAME),
+		expand(OUTDIR + "/aln.{transcript}.{graph}.full_length.gam", transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME),
+		#expand(OUTDIR + "/alignmentstats_{transcript}_{graph}.txt", transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME),
+		expand(OUTDIR + "/matrix.{reads}.{transcript}.{graph}.all.txt", reads=READFILE_NAME, transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME),
+		#expand(OUTDIR + "/matrix.{reads}.{transcript}.{graph}.bestmatch.txt", reads=READFILE_NAME, transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME),
+		expand(OUTDIR + "/matrixstats.{reads}.{transcript}.{graph}.txt", reads=READFILE_NAME, transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME),
+		expand(OUTDIR + "/CountMatrix.{reads}.{transcript}.{graph}.txt", reads=READFILE_NAME, transcript=TRANSCRIPTFILE_NAME, graph=GRAPHFILE_NAME)
 
 rule align:
 	input:
-		graph = "input/{graph}.gfa",
+		graph = graph_path,
 		reads = readfile_withending
 	output:
-		"output/aln_{reads}_{graph}_all.gam"
+		OUTDIR + "/aln.{reads}.{graph}.all.gam"
 	benchmark:
-		"benchmark/aln_{reads}_{graph}_all.txt"
+		OUTDIR + "/benchmark/aln.{reads}.{graph}.all.txt"
 	threads: 15
 	run:
 		shell("mkdir -p tmp")
@@ -54,62 +62,62 @@ rule align:
 
 rule postprocess:
 	input:
-		all_alns = "output/aln_{reads}_{graph}_all.gam",
+		all_alns = OUTDIR + "/aln.{reads}.{graph}.all.gam",
 		reads = readfile_withending
 	output:
-		selected_alns = "output/aln_{reads}_{graph}_selected.gam",
-		full_len_alns = "output/aln_{reads}_{graph}_full_length.gam",
-		summary = "tmp/run_{reads}_{graph}_summary.txt",
+		selected_alns = OUTDIR + "/aln.{reads}.{graph}.selected.gam",
+		full_len_alns = OUTDIR + "/aln.{reads}.{graph}.full_length.gam",
+		summary = "tmp/run.{reads}.{graph}.summary.txt",
 	benchmark:
-		"benchmark/postprocess_{reads}_{graph}.txt"
+		OUTDIR + "/benchmark/postprocess.{reads}.{graph}.txt"
 	shell:
 		"{ALIGNERBINPATH}/Postprocess {input.all_alns} {input.reads} {output.selected_alns} {output.full_len_alns} {output.summary}"
 
 rule pick_longest:
 	input:
-		"output/aln_{reads}_{graph}_selected.gam"
+		OUTDIR + "/aln.{reads}.{graph}.selected.gam"
 	output:
-		"output/aln_{reads}_{graph}_longest.gam"
+		OUTDIR + "/aln.{reads}.{graph}.longest.gam"
 	benchmark:
-		"benchmark/pick_longest_{reads}_{graph}.txt"
+		OUTDIR + "/benchmark/pick_longest.{reads}.{graph}.txt"
 	shell:
 		"{ALIGNERBINPATH}/SelectLongestAlignment {input} {output}"
 
 rule assign_reads_to_transcripts:
 	input:
-		readalns = "output/aln_{reads}_{graph}_selected.gam",
-		transcripts = "output/aln_{transcripts}_{graph}_full_length.gam",
+		readalns = OUTDIR + "/aln.{reads}.{graph}.selected.gam",
+		transcripts = OUTDIR + "/aln.{transcripts}.{graph}.full_length.gam",
 		readfa = readfile_withending
 	output:
-		"output/matrix_{reads}_{transcripts}_{graph}_all.txt"
+		OUTDIR + "/matrix.{reads}.{transcripts}.{graph}.all.txt"
 	benchmark:
-		"benchmark/assign_reads_to_transcript_{reads}_{transcripts}_{graph}.txt"
+		OUTDIR + "/benchmark/assign_reads_to_transcript.{reads}.{transcripts}.{graph}.txt"
 	shell:
 		"{ALIGNERBINPATH}/AlignmentSubsequenceIdentity {input.transcripts} {input.readalns} {input.readfa} > {output}"
 
 #rule find_best_assignments:
 #	input:
-#		"output/matrix_{runid}_all.txt"
+#		OUTDIR + "/matrix_{runid}_all.txt"
 #	output:
-#		"output/matrix_{runid}_bestmatch.txt"
+#		OUTDIR + "/matrix_{runid}_bestmatch.txt"
 #	benchmark:
-#		"benchmark/bestmatch_{runid}.txt"
+#		OUTDIR + "/benchmark/bestmatch_{runid}.txt"
 #	shell:
 #		"{SCRIPTPATH}/find_matrix_bestmatch.py {input} 0.4 0.95 > {output}"
 
 rule output_assignment_statistics:
 	input:
-		"output/matrix_{reads}_{transcripts}_{graph}_all.txt",
-		#"output/matrix_{reads}_{transcripts}_{graph}_bestmatch.txt",
-		#"output/matrix_{reads}_{transcripts}_{graph}_unambiguous.txt",
-		#read_stdout = "tmp/aligner_stdout_{reads}_{graph}.txt",
+		OUTDIR + "/matrix.{reads}.{transcripts}.{graph}.all.txt",
+		#OUTDIR + "/matrix.{reads}.{transcripts}.{graph}_bestmatch.txt",
+		#OUTDIR + "/matrix.{reads}.{transcripts}.{graph}_unambiguous.txt",
+		#read_stdout = "tmp/aligner_stdout.{reads}.{graph}.txt",
 		#transcript_stdout = "tmp/aligner_stdout.txt"
 	output:
-		"output/matrixstats_{reads}_{transcripts}_{graph}.txt"
+		OUTDIR + "/matrixstats.{reads}.{transcripts}.{graph}.txt"
 	params:
-		allmatrix = "output/matrix_{reads}_{transcripts}_{graph}_all.txt",
-		#bestmatchmatrix = "output/matrix_{reads}_{transcripts}_{graph}_bestmatch.txt",
-		#unambiguousmatrix = "output/matrix_{reads}_{transcripts}_{graph}_unambiguous.txt"
+		allmatrix = OUTDIR + "/matrix.{reads}.{transcripts}.{graph}.all.txt",
+		#bestmatchmatrix = OUTDIR + "/matrix.{reads}.{transcripts}.{graph}_bestmatch.txt",
+		#unambiguousmatrix = OUTDIR + "/matrix.{reads}.{transcripts}.{graph}_unambiguous.txt"
 	run:
 		shell("echo 'Number of reads considered:' >> {output}")
 		#shell("grep 'Reads with an alignment:' < {input.read_stdout} | cut -d ' ' -f 5 >> {output}")
@@ -128,10 +136,10 @@ rule output_assignment_statistics:
 
 rule generateCountMatrix:
 	input:
-		matrix = "output/matrix_{reads}_{transcripts}_{graph}_all.txt"
+		matrix = OUTDIR + "/matrix.{reads}.{transcripts}.{graph}.all.txt"
 	output:
-		"output/CountMatrix_{reads}_{transcripts}_{graph}.txt"
+		OUTDIR + "/CountMatrix.{reads}.{transcripts}.{graph}.txt"
 	benchmark:
-		"benchmark/generateCount_{reads}_{transcripts}_{graph}.txt"
+		OUTDIR + "/benchmark/generateCount.{reads}.{transcripts}.{graph}.txt"
 	shell:
 		"python {SCRIPTPATH}/ThreePrime.py -m {input.matrix} >> {output}"
