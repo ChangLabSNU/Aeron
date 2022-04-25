@@ -6,11 +6,11 @@
 
 # input splice graph
 # format must be .vg
-graph: input/human-SIRV3-np.gfa
+graph: /qbio/hansb/polysome/data/refs/human_SIRV3_np.gfa
 
 # reference transcripts
 # format can be either fasta/fastq, gzipped or not
-transcripts: input/human-SIRV3-np-t.fasta.gz
+transcripts: /qbio/hansb/polysome/data/refs/human_SIRV3_np.fa.gz
 
 # sequenced reads
 # format can be either fasta/fastq, gzipped or not
