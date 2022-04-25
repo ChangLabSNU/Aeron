@@ -31,9 +31,8 @@ def readfile_withending(wildcards):
 rule all:
 	input:
 		expand(OUTDIR + "/{reads}/aln.all.gam", reads=READFILE_NAME + ["refs"]),
-		expand(OUTDIR + "/{reads}/aln.selected.gam", reads=READFILE_NAME),
-		expand(OUTDIR + "/{reads}/aln.full_length.gam", reads=READFILE_NAME),
-		OUTDIR + "/refs/aln.full_length.gam",
+		expand(OUTDIR + "/{reads}/aln.selected.gam", reads=READFILE_NAME + ["refs"]),
+		expand(OUTDIR + "/{reads}/aln.full_length.gam", reads=READFILE_NAME + ['refs']),
 		expand(OUTDIR + "/{reads}/matrix.all.txt", reads=READFILE_NAME),
 		expand(OUTDIR + "/{reads}/matrixstats.txt", reads=READFILE_NAME),
 		expand(OUTDIR + "/{reads}/CountMatrix.txt", reads=READFILE_NAME)
