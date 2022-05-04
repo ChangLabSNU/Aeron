@@ -7,6 +7,11 @@ matrixfile = ''
 	#opts, args = getopt.getopt(sys.argv[1:],"hi:o:",["ifile=","ofile="])
 parser = argparse.ArgumentParser(description='Quantification Counter')
 parser.add_argument('-m', action="store", dest="matrix")
+parser.add_argument(
+    '-p', 
+    default='0.2', 
+    help='cutoff for how much of the transcript graph alignment is covered by a read'
+)
 
 par = parser.parse_args()
 
@@ -21,7 +26,7 @@ nam=""
 tmp="hi"
 for line in m:
     ent=line.rstrip().split("\t")
-    if(float(ent[-1])>0.2):
+    if(float(ent[-1])>par.p):
         if(ent[0] != nam):
             max=0
             mt[ent[0]]=""

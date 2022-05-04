@@ -1,6 +1,5 @@
 import os
 
-configfile: "config.yaml"
 VGPATH = config["vgpath"]
 SCRIPTPATH=config["scripts"]
 ALIGNERBINPATH = config["binaries"]
@@ -13,6 +12,7 @@ ALIGNERBANDWIDTH = config["aligner_bandwidth"]
 GTFPATH = config["gtffile"]
 ALIGNMENTSELECTION = config["alignment_selection"]
 ECUTOFF = config["alignment_E_cutoff"]
+TCUTOFF = config["transcript_coverage_cutoff"]
 OUTDIR = config["outdir"]
 
 if isinstance(READFILE_FULLNAME, str): READFILE_FULLNAME = [READFILE_FULLNAME]
@@ -87,16 +87,6 @@ rule assign_reads_to_transcripts:
 	shell:
 		"{ALIGNERBINPATH}/AlignmentSubsequenceIdentity {input.transcripts} {input.readalns} {input.readfa} > {output}"
 
-#rule find_best_assignments:
-#	input:
-#		OUTDIR + "/matrix_{runid}_all.txt"
-#	output:
-#		OUTDIR + "/matrix_{runid}_bestmatch.txt"
-#	benchmark:
-#		OUTDIR + "/benchmark/bestmatch_{runid}.txt"
-#	shell:
-#		"{SCRIPTPATH}/find_matrix_bestmatch.py {input} 0.4 0.95 > {output}"
-
 rule output_assignment_statistics:
 	input:
 		OUTDIR + "/{reads}/matrix.all.txt",
@@ -106,7 +96,9 @@ rule output_assignment_statistics:
 		allmatrix = OUTDIR + "/{reads}/matrix.all.txt",
 	run:
 		shell("echo 'Number of reads considered:' >> {output}")
+		# shell("grep 'Reads with an alignment:' < {input.read_stdout} | cut -d ' ' -f 5 >> {output}")
 		shell("echo 'Number of transcripts considered:' >> {output}")
+		# shell("grep 'Output end-to-end alignments:' < {input.transcript_stdout} | cut -d ' ' -f 3 >> {output}")
 		shell("echo 'Number of reads which overlap a transcript:' >> {output}"),
 		shell("cut -f 1 {params.allmatrix} | sort | uniq | wc -l >> {output}"),
 		shell("echo 'Number of transcripts which overlap a read:' >> {output}"),
@@ -122,4 +114,4 @@ rule generateCountMatrix:
 	benchmark:
 		OUTDIR + "/benchmark/{reads}/generateCount.txt"
 	shell:
-		"python {SCRIPTPATH}/ThreePrime.py -m {input.matrix} >> {output}"
+		"python {SCRIPTPATH}/ThreePrime.py -m {input.matrix} -p {TCUTOFF} >> {output}"
