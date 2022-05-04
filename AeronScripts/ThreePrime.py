@@ -8,8 +8,9 @@ matrixfile = ''
 parser = argparse.ArgumentParser(description='Quantification Counter')
 parser.add_argument('-m', action="store", dest="matrix")
 parser.add_argument(
-    '-p', 
-    default='0.2', 
+    '-p',
+    type=float,
+    default=0.2, 
     help='cutoff for how much of the transcript graph alignment is covered by a read'
 )
 
