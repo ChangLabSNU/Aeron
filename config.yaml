@@ -36,7 +36,11 @@ fusion_min_score_difference: 200
 
 #options: --greedy-length --greedy-score --greedy-E --schedule-score --schedule-length --schedule-inverse-E-product --schedule-inverse-E-sum
 alignment_selection: --greedy-length
+# alignment expected value cutoff. Obsolete.
 alignment_E_cutoff: 1
+
+# transcript path coverage cutoff
+transcript_coverage_cutoff: 0.2
 
 #bandwidth for the aligner. Higher means more accurate but slower alignment.
 aligner_bandwidth: 35
